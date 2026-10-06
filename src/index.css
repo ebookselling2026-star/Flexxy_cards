@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'JetBrains Mono', 'Plus Jakarta Sans', monospace, sans-serif;
+    background-color: #04070b;
+    color: #e2e8f0;
+    overflow-x: hidden;
+  }
+  
+  .font-terminal {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .font-gaming {
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  .font-teko {
+    font-family: 'Teko', sans-serif;
+  }
+}
+
+/* Cyber Matrix / Hacker Green Visual System */
+.cyber-bg {
+  background-color: #06090e;
+  background-image: 
+    radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(0, 255, 102, 0.06) 0%, transparent 50%),
+    linear-gradient(to right, rgba(16, 185, 129, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+}
+
+.cyber-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+}
+
+.text-glow-hacker {
+  text-shadow: 0 0 14px rgba(16, 185, 129, 0.8), 0 0 28px rgba(0, 255, 102, 0.4);
+}
+
+.text-glow-orange {
+  text-shadow: 0 0 15px rgba(255, 106, 0, 0.7), 0 0 30px rgba(255, 106, 0, 0.35);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 12px rgba(6, 182, 212, 0.8), 0 0 24px rgba(6, 182, 212, 0.4);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.8), 0 0 24px rgba(16, 185, 129, 0.4);
+}
+
+.box-glow-hacker {
+  box-shadow: 0 0 25px -4px rgba(16, 185, 129, 0.45);
+}
+
+.box-glow-cyan {
+  box-shadow: 0 0 25px -4px rgba(6, 182, 212, 0.35);
+}
+
+/* Hacker HUD corner brackets */
+.hud-corner {
+  position: relative;
+}
+.hud-corner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid rgba(16, 185, 129, 0.9);
+  border-left: 2px solid rgba(16, 185, 129, 0.9);
+}
+.hud-corner::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid rgba(16, 185, 129, 0.9);
+  border-right: 2px solid rgba(16, 185, 129, 0.9);
+}
+
+/* Diagonal gaming cuts */
+.clip-gaming-card {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+.clip-gaming-btn {
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+/* Matrix scanline animation */
+@keyframes matrix-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+.animate-scanline {
+  animation: matrix-scan 2.5s ease-in-out infinite;
+}
+
+/* Subtle scanlines effect */
+.scanlines-overlay {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.2) 50%
+  );
+  background-size: 100% 4px;
+}
+
+@keyframes pulse-radar {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.animate-radar {
+  animation: pulse-radar 2s infinite ease-in-out;
+}
+

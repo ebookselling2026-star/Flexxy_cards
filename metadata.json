@@ -1,0 +1,6 @@
+{
+  "name": "Flexxy Cards",
+  "description": "Exclusive Free Fire Diamond Top-Up store featuring dynamic UPI order creation, FamGateway API automated verification, live countdown timer, and instant 5-15 minute UID delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
