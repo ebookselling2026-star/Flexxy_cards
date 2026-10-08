@@ -1,4 +1,5 @@
 import { OrderResponse, OrderStatusResponse, OrderRecord, PlayerVerifyResponse } from '../types';
+import { syncOrderToFirebase, updateFirebaseOrderStatus, getFirebaseOrder } from '../lib/firestoreService';
 
 const LOCAL_STORAGE_ORDERS_KEY = 'ff_topup_orders';
 const LOCAL_STORAGE_CONFIG_KEY = 'ff_fampay_config';
@@ -82,15 +83,23 @@ export async function createOrder(params: {
     if (res.ok) {
       const data: OrderResponse = await res.json();
       if (data.success) {
-        saveLocalOrder({
+        const orderData = {
           order_id: data.order_id,
           amount: data.amount,
           diamonds: params.diamonds,
+          bonus_diamonds: params.bonusDiamonds,
           player_uid: params.playerUid,
+          customer_name: params.customerName || 'Free Fire Player',
+          customer_phone: params.customerPhone || '',
           fampay_id: data.fampay_id || localConfig.fampayId || 'famgateway@fam',
-          status: 'PENDING',
+          status: 'PENDING' as const,
+          qr_url: data.qr_url,
+          upi_intent: data.upi_intent,
           created_at: Date.now(),
-        });
+        };
+        saveLocalOrder(orderData);
+        // Persist to Firebase Firestore
+        syncOrderToFirebase(orderData).catch(err => console.warn('Firestore sync failed:', err));
         return data;
       }
     }
@@ -116,15 +125,23 @@ export async function createOrder(params: {
       mode: 'sandbox',
     };
 
-    saveLocalOrder({
+    const fallbackOrderRecord = {
       order_id: fallbackOrderId,
       amount: params.amount,
       diamonds: params.diamonds,
+      bonus_diamonds: params.bonusDiamonds,
       player_uid: params.playerUid,
+      customer_name: params.customerName || 'Free Fire Player',
+      customer_phone: params.customerPhone || '',
       fampay_id: effectiveFamPayId,
-      status: 'PENDING',
+      status: 'PENDING' as const,
+      qr_url: qrUrl,
+      upi_intent: upiIntent,
       created_at: Date.now(),
-    });
+    };
+
+    saveLocalOrder(fallbackOrderRecord);
+    syncOrderToFirebase(fallbackOrderRecord).catch(err => console.warn('Firestore fallback sync failed:', err));
 
     return fallbackResponse;
   }
@@ -149,6 +166,7 @@ export async function fetchOrderStatus(orderId: string): Promise<OrderStatusResp
             utr: data.utr,
             created_at: data.created_at || Date.now(),
           });
+          updateFirebaseOrderStatus(data.order_id, 'SUCCESS', data.utr).catch(err => console.warn('Firebase status update failed:', err));
         }
         return {
           ...data,
@@ -251,6 +269,7 @@ export async function simulatePayment(orderId: string): Promise<{ success: boole
     local.utr = generatedUtr;
     saveLocalOrder(local);
   }
+  updateFirebaseOrderStatus(orderId, 'SUCCESS', generatedUtr).catch(err => console.warn('Firebase status update failed:', err));
 
   return { success: true, utr: generatedUtr };
 }
@@ -272,6 +291,7 @@ export async function verifyBankUtr(orderId: string, utr: string): Promise<{ suc
         local.utr = data.utr || utr;
         saveLocalOrder(local);
       }
+      updateFirebaseOrderStatus(orderId, 'SUCCESS', data.utr || utr).catch(err => console.warn('Firebase status update failed:', err));
       return { success: true, message: data?.message || 'Payment confirmed successfully!' };
     }
 
@@ -298,6 +318,25 @@ export async function lookupOrders(query: string): Promise<OrderRecord[]> {
     }
   } catch (e) {
     console.warn('Lookup server error:', e);
+  }
+
+  // Check Firebase directly if server returns nothing
+  try {
+    const fbOrder = await getFirebaseOrder(query);
+    if (fbOrder) {
+      return [{
+        order_id: fbOrder.order_id,
+        amount: fbOrder.amount,
+        diamonds: fbOrder.diamonds,
+        player_uid: fbOrder.player_uid,
+        fampay_id: fbOrder.fampay_id || 'thakur3041@fam',
+        status: fbOrder.status,
+        utr: fbOrder.utr,
+        created_at: fbOrder.created_at,
+      }];
+    }
+  } catch (e) {
+    console.warn('Firebase order lookup error:', e);
   }
 
   const locals = getLocalOrders();

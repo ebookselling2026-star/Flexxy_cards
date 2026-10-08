@@ -21,7 +21,9 @@ import {
   ArrowRight,
   LogOut,
   Zap,
+  Database,
 } from 'lucide-react';
+import { getFirebaseOrders, updateFirebaseOrderStatus } from '../lib/firestoreService';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -94,15 +96,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const loadAdminData = async () => {
     setLoadingOrders(true);
     try {
-      const [ordersRes, configRes] = await Promise.all([
-        fetch('/api/admin/orders'),
-        fetch('/api/gateway-config'),
+      const [ordersRes, configRes, fbOrders] = await Promise.all([
+        fetch('/api/admin/orders').catch(() => null),
+        fetch('/api/gateway-config').catch(() => null),
+        getFirebaseOrders(100).catch(() => []),
       ]);
 
-      if (ordersRes.ok) {
+      let combinedOrders: any[] = [];
+
+      if (ordersRes && ordersRes.ok) {
         const data = await ordersRes.json();
         if (data.success) {
-          setOrders(data.orders || []);
+          combinedOrders = data.orders || [];
           setStats(data.stats || {});
           if (data.currentFamPayId) {
             setFampayId(data.currentFamPayId);
@@ -116,7 +121,40 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         }
       }
 
-      if (configRes.ok) {
+      // Merge with Firebase Orders so any client-saved Firestore orders appear even on server restarts
+      if (fbOrders && fbOrders.length > 0) {
+        const orderMap = new Map<string, any>();
+        combinedOrders.forEach(o => orderMap.set(o.order_id, o));
+        fbOrders.forEach(fo => {
+          if (!orderMap.has(fo.order_id)) {
+            orderMap.set(fo.order_id, fo);
+          } else {
+            // Take newest status
+            const existing = orderMap.get(fo.order_id);
+            if (fo.status === 'SUCCESS' && existing.status !== 'SUCCESS') {
+              orderMap.set(fo.order_id, { ...existing, status: 'SUCCESS', utr: fo.utr || existing.utr });
+            }
+          }
+        });
+        combinedOrders = Array.from(orderMap.values());
+      }
+
+      setOrders(combinedOrders);
+
+      // Recalculate stats
+      const totalRev = combinedOrders
+        .filter((o) => o.status === 'SUCCESS')
+        .reduce((sum, o) => sum + (o.amount || 0), 0);
+
+      setStats({
+        totalOrders: combinedOrders.length,
+        successOrders: combinedOrders.filter((o) => o.status === 'SUCCESS').length,
+        pendingOrders: combinedOrders.filter((o) => o.status === 'PENDING').length,
+        expiredOrders: combinedOrders.filter((o) => o.status === 'EXPIRED').length,
+        totalRevenue: totalRev,
+      });
+
+      if (configRes && configRes.ok) {
         const cfg = await configRes.json();
         if (cfg.fampayId) {
           setFampayId(cfg.fampayId);
@@ -190,7 +228,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         setPinInput('');
         loadAdminData();
       } else {
-        setAuthError('Incorrect Admin Passcode. Default is admin123');
+        setAuthError('Incorrect Admin Passcode. Default is Gaurav3041');
       }
     } catch {
       setAuthError('Server error while authenticating');
@@ -235,6 +273,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const handleForceStatus = async (orderId: string, status: string) => {
     try {
       const customUtr = prompt('Enter Bank UTR (or leave empty to auto-generate):');
+      // Update in Firebase Firestore
+      await updateFirebaseOrderStatus(orderId, status as any, customUtr || undefined).catch(err => console.warn('Firebase error:', err));
+
       const res = await fetch('/api/admin/update-order-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -247,9 +288,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
       if (res.ok) {
         loadAdminData();
+      } else {
+        loadAdminData();
       }
     } catch (e) {
       console.error(e);
+      loadAdminData();
     }
   };
 
@@ -375,7 +419,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 Enter Admin Passcode
               </h4>
               <p className="text-xs text-slate-400">
-                Authorized store managers only. Default passcode: <code className="text-amber-400 font-mono font-bold bg-slate-900 px-1.5 py-0.5 rounded">admin123</code>
+                Authorized store managers only. Default passcode: <code className="text-amber-400 font-mono font-bold bg-slate-900 px-1.5 py-0.5 rounded">Gaurav3041</code>
               </p>
             </div>
 

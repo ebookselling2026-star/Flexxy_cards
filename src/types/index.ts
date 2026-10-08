@@ -55,10 +55,15 @@ export interface OrderRecord {
   order_id: string;
   amount: number;
   diamonds: number;
+  bonus_diamonds?: number;
   player_uid: string;
+  customer_name?: string;
+  customer_phone?: string;
   status: 'PENDING' | 'SUCCESS' | 'EXPIRED' | 'FAILED';
   fampay_id?: string;
   utr?: string;
+  qr_url?: string;
+  upi_intent?: string;
   created_at: number;
 }
 

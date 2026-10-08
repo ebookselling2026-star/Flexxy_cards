@@ -51,7 +51,7 @@ app.use((req: Request, _res: Response, next) => {
 app.use(express.json());
 
 // Dynamic Gateway Config & Admin Security
-let adminPin = process.env.ADMIN_PIN || 'admin123';
+let adminPin = process.env.ADMIN_PIN || 'Gaurav3041';
 
 const storageDir = isVercel ? os.tmpdir() : process.cwd();
 const GATEWAY_CONFIG_FILE = path.join(storageDir, 'gateway_config.json');
