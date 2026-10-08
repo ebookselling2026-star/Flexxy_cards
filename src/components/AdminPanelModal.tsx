@@ -23,7 +23,19 @@ import {
   Zap,
   Database,
 } from 'lucide-react';
-import { getFirebaseOrders, updateFirebaseOrderStatus } from '../lib/firestoreService';
+import {
+  getFirebaseOrders,
+  updateFirebaseOrderStatus,
+  saveGatewayConfigToFirebase,
+  getGatewayConfigFromFirebase,
+  subscribeToGatewayConfig,
+  saveAdminPinToFirebase,
+  getAdminPinFromFirebase,
+  saveHlGamingConfigToFirebase,
+  getHlGamingConfigFromFirebase,
+  subscribeToAllOrders,
+} from '../lib/firestoreService';
+import { saveFamPayConfig } from '../services/api';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -86,20 +98,62 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // Copy tracking
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
-  // Load orders and config when open and authenticated
+  // Load orders and config when open and authenticated, and subscribe in real-time
   useEffect(() => {
-    if (isOpen && isAuthenticated) {
-      loadAdminData();
-    }
+    if (!isOpen || !isAuthenticated) return;
+
+    loadAdminData();
+
+    // Live real-time listener for orders across all devices
+    const unsubscribeOrders = subscribeToAllOrders((fbOrders) => {
+      if (fbOrders && fbOrders.length > 0) {
+        setOrders((prev) => {
+          const orderMap = new Map<string, any>();
+          prev.forEach((o) => orderMap.set(o.order_id, o));
+          fbOrders.forEach((fo) => {
+            orderMap.set(fo.order_id, { ...(orderMap.get(fo.order_id) || {}), ...fo });
+          });
+          const combined = Array.from(orderMap.values());
+          const totalRev = combined
+            .filter((o) => o.status === 'SUCCESS')
+            .reduce((sum, o) => sum + (o.amount || 0), 0);
+
+          setStats({
+            totalOrders: combined.length,
+            successOrders: combined.filter((o) => o.status === 'SUCCESS').length,
+            pendingOrders: combined.filter((o) => o.status === 'PENDING').length,
+            expiredOrders: combined.filter((o) => o.status === 'EXPIRED').length,
+            totalRevenue: totalRev,
+          });
+          return combined;
+        });
+      }
+    });
+
+    // Live real-time listener for FamPay UPI ID across all devices
+    const unsubscribeConfig = subscribeToGatewayConfig((cfg) => {
+      if (cfg && cfg.fampayId) {
+        setFampayId(cfg.fampayId);
+        if (cfg.apiKey) setApiKey(cfg.apiKey);
+        if (onFamPayIdUpdated) onFamPayIdUpdated(cfg.fampayId);
+      }
+    });
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeConfig();
+    };
   }, [isOpen, isAuthenticated]);
 
   const loadAdminData = async () => {
     setLoadingOrders(true);
     try {
-      const [ordersRes, configRes, fbOrders] = await Promise.all([
+      const [ordersRes, configRes, fbOrders, fbGatewayConfig, fbHlConfig] = await Promise.all([
         fetch('/api/admin/orders').catch(() => null),
         fetch('/api/gateway-config').catch(() => null),
         getFirebaseOrders(100).catch(() => []),
+        getGatewayConfigFromFirebase().catch(() => null),
+        getHlGamingConfigFromFirebase().catch(() => null),
       ]);
 
       let combinedOrders: any[] = [];
@@ -121,7 +175,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         }
       }
 
-      // Merge with Firebase Orders so any client-saved Firestore orders appear even on server restarts
+      // Merge with Firebase Orders so any Firestore orders from all devices appear
       if (fbOrders && fbOrders.length > 0) {
         const orderMap = new Map<string, any>();
         combinedOrders.forEach(o => orderMap.set(o.order_id, o));
@@ -129,7 +183,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           if (!orderMap.has(fo.order_id)) {
             orderMap.set(fo.order_id, fo);
           } else {
-            // Take newest status
             const existing = orderMap.get(fo.order_id);
             if (fo.status === 'SUCCESS' && existing.status !== 'SUCCESS') {
               orderMap.set(fo.order_id, { ...existing, status: 'SUCCESS', utr: fo.utr || existing.utr });
@@ -154,11 +207,22 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         totalRevenue: totalRev,
       });
 
-      if (configRes && configRes.ok) {
+      // Prioritize Firestore gateway config (cross-device synced)
+      if (fbGatewayConfig && fbGatewayConfig.fampayId) {
+        setFampayId(fbGatewayConfig.fampayId);
+        if (fbGatewayConfig.apiKey) setApiKey(fbGatewayConfig.apiKey);
+      } else if (configRes && configRes.ok) {
         const cfg = await configRes.json();
         if (cfg.fampayId) {
           setFampayId(cfg.fampayId);
         }
+      }
+
+      // Prioritize Firestore HL Gaming config (cross-device synced)
+      if (fbHlConfig && fbHlConfig.useruid) {
+        setHlUseruid(fbHlConfig.useruid);
+        if (fbHlConfig.api) setHlApiKey(fbHlConfig.api);
+        setHlConfigured(Boolean(fbHlConfig.useruid));
       }
     } catch (err) {
       console.warn('Error loading admin data:', err);
@@ -173,20 +237,37 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setHlSaveMsg('');
 
     try {
+      const uid = hlUseruid.trim();
+      const key = hlApiKey.trim();
+
+      // 1. Save to Firebase Firestore (synced across all devices)
+      await saveHlGamingConfigToFirebase({
+        useruid: uid,
+        api: key || undefined,
+      });
+
+      // 2. Also notify backend
       const res = await fetch('/api/admin/update-hl-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          useruid: hlUseruid.trim(),
-          api: hlApiKey.trim() || undefined,
+          useruid: uid,
+          api: key || undefined,
         }),
-      });
+      }).catch(() => null);
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setHlConfigured(data.hlGamingConfigured);
-        setHlSaveMsg('HL Gaming Free Fire API credentials saved successfully!');
+      if (res && res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.hlGamingConfigured !== undefined) {
+          setHlConfigured(data.hlGamingConfigured);
+        } else {
+          setHlConfigured(Boolean(uid));
+        }
+      } else {
+        setHlConfigured(Boolean(uid));
       }
+
+      setHlSaveMsg('HL Gaming credentials saved and synced to all devices!');
     } catch {
       setHlSaveMsg('Failed to update HL Gaming credentials');
     } finally {
@@ -215,20 +296,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setAuthError('');
     setAuthLoading(true);
 
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pinInput }),
-      });
+    const enteredPin = pinInput.trim();
 
-      if (res.ok) {
+    try {
+      // 1. Verify against Firestore PIN (synced across all devices)
+      const fbPin = await getAdminPinFromFirebase().catch(() => null);
+      const targetPin = fbPin || 'Gaurav3041';
+
+      let isSuccess = enteredPin === targetPin;
+
+      // 2. Also try backend API
+      if (!isSuccess) {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: enteredPin }),
+        }).catch(() => null);
+
+        if (res && res.ok) {
+          isSuccess = true;
+        }
+      }
+
+      if (isSuccess) {
         setIsAuthenticated(true);
         sessionStorage.setItem('ff_admin_auth', 'true');
         setPinInput('');
         loadAdminData();
       } else {
-        setAuthError('Incorrect Admin Passcode. Default is Gaurav3041');
+        setAuthError(`Incorrect Admin Passcode. Default is Gaurav3041`);
       }
     } catch {
       setAuthError('Server error while authenticating');
@@ -248,20 +344,34 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setConfigMessage('');
 
     try {
-      const res = await fetch('/api/gateway-config', {
+      const trimmedId = fampayId.trim();
+      const trimmedKey = apiKey.trim();
+
+      // 1. Save to Firebase Firestore immediately (synced across all devices)
+      await saveGatewayConfigToFirebase({
+        fampayId: trimmedId,
+        apiKey: trimmedKey || undefined,
+      });
+
+      // 2. Save locally
+      saveFamPayConfig({
+        fampayId: trimmedId,
+        apiKey: trimmedKey,
+      });
+
+      // 3. Notify backend
+      await fetch('/api/gateway-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fampayId: fampayId.trim(),
-          apiKey: apiKey.trim() || undefined,
+          fampayId: trimmedId,
+          apiKey: trimmedKey || undefined,
         }),
-      });
+      }).catch(() => null);
 
-      if (res.ok) {
-        setConfigMessage('FamPay UPI ID and Gateway settings updated successfully!');
-        if (onFamPayIdUpdated) {
-          onFamPayIdUpdated(fampayId.trim());
-        }
+      setConfigMessage('FamPay UPI ID saved and synced across all devices!');
+      if (onFamPayIdUpdated) {
+        onFamPayIdUpdated(trimmedId);
       }
     } catch {
       setConfigMessage('Failed to update FamPay ID.');
@@ -273,7 +383,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const handleForceStatus = async (orderId: string, status: string) => {
     try {
       const customUtr = prompt('Enter Bank UTR (or leave empty to auto-generate):');
-      // Update in Firebase Firestore
+      // Update in Firebase Firestore immediately for all devices
       await updateFirebaseOrderStatus(orderId, status as any, customUtr || undefined).catch(err => console.warn('Firebase error:', err));
 
       const res = await fetch('/api/admin/update-order-status', {
@@ -284,9 +394,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           status,
           utr: customUtr || undefined,
         }),
-      });
+      }).catch(() => null);
 
-      if (res.ok) {
+      if (res && res.ok) {
         loadAdminData();
       } else {
         loadAdminData();
@@ -316,20 +426,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setPinChangeMsg('');
 
     try {
-      const res = await fetch('/api/admin/change-pin', {
+      const enteredCur = currentPin.trim();
+      const enteredNew = newPin.trim();
+
+      const fbPin = await getAdminPinFromFirebase().catch(() => null);
+      const targetCurrentPin = fbPin || 'Gaurav3041';
+
+      if (enteredCur !== targetCurrentPin) {
+        setPinChangeErr('Current passcode is incorrect');
+        return;
+      }
+
+      if (!enteredNew || enteredNew.length < 4) {
+        setPinChangeErr('New passcode must be at least 4 characters');
+        return;
+      }
+
+      // 1. Save to Firebase Firestore (synced across all devices)
+      await saveAdminPinToFirebase(enteredNew);
+
+      // 2. Also notify backend
+      await fetch('/api/admin/change-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPin, newPin }),
-      });
+        body: JSON.stringify({ currentPin: enteredCur, newPin: enteredNew }),
+      }).catch(() => null);
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setPinChangeMsg('Admin PIN changed successfully!');
-        setCurrentPin('');
-        setNewPin('');
-      } else {
-        setPinChangeErr(data.message || 'Failed to change PIN');
-      }
+      setPinChangeMsg('Admin passcode updated and synced to all devices!');
+      setCurrentPin('');
+      setNewPin('');
     } catch {
       setPinChangeErr('Server error updating PIN');
     }

@@ -8,5 +8,11 @@ service cloud.firestore {
       allow read, create, update: if true;
       allow delete: if false;
     }
+
+    // App settings collection (UPI ID, Admin credentials, Gateway config, etc.)
+    // Shared and synced across all devices
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
   }
 }

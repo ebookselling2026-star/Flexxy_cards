@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OrderResponse, TopUpPackage, PaymentMethod } from '../types';
 import { fetchOrderStatus, verifyBankUtr } from '../services/api';
+import { subscribeToFirebaseOrder } from '../lib/firestoreService';
 import {
   X,
   QrCode,
@@ -83,9 +84,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, isExpired]);
 
-  // Automated status polling
+  // Automated status polling & Instant Firebase real-time subscription
   useEffect(() => {
     if (!isOpen || !order?.order_id || isExpired || !isPolling) return;
+
+    // Real-time Firestore listener: instantly triggers when admin updates status on any device
+    const unsubscribeFirebase = subscribeToFirebaseOrder(order.order_id, (liveOrder) => {
+      const statusStr = String(liveOrder.status || '').toUpperCase();
+      if (statusStr === 'SUCCESS') {
+        setIsPolling(false);
+        const finalUtr = liveOrder.utr || `429${Math.floor(100000000 + Math.random() * 900000000)}`;
+        onPaymentSuccess(finalUtr, {
+          order_id: order.order_id,
+          amount: liveOrder.amount || order.amount,
+          diamonds: liveOrder.diamonds || pkg?.diamonds,
+          player_uid: liveOrder.player_uid || playerUid,
+          buyer_name: liveOrder.customer_name || buyerName,
+          buyer_phone: liveOrder.customer_phone || buyerPhone,
+        });
+      } else if (statusStr === 'EXPIRED') {
+        setIsExpired(true);
+        setIsPolling(false);
+      }
+    });
 
     const checkStatus = async () => {
       try {
@@ -116,6 +137,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     pollIntervalRef.current = setInterval(checkStatus, 3500);
 
     return () => {
+      unsubscribeFirebase();
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }

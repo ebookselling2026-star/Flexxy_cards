@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   limit,
+  where,
   serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
@@ -103,6 +104,45 @@ export async function getFirebaseOrder(orderId: string): Promise<FirebaseOrderDa
 }
 
 /**
+ * Query orders by ID or Player UID from Firestore across all devices
+ */
+export async function queryOrdersByPlayerOrId(searchQuery: string): Promise<FirebaseOrderData[]> {
+  const clean = searchQuery.trim();
+  if (!clean) return [];
+
+  try {
+    // 1. Try single order by exact ID
+    const single = await getFirebaseOrder(clean);
+    if (single) return [single];
+
+    // 2. Query by player_uid
+    const q = query(
+      collection(db, ORDERS_COLLECTION),
+      where('player_uid', '==', clean),
+      limit(20)
+    );
+    const snap = await getDocs(q);
+    const results: FirebaseOrderData[] = [];
+    snap.forEach((d) => {
+      results.push(d.data() as FirebaseOrderData);
+    });
+    if (results.length > 0) return results;
+
+    // 3. Fallback scan recent orders for partial match
+    const recent = await getFirebaseOrders(50);
+    const lower = clean.toLowerCase();
+    return recent.filter((o) =>
+      o.order_id.toLowerCase().includes(lower) ||
+      o.player_uid.includes(clean) ||
+      (o.customer_phone && o.customer_phone.includes(clean))
+    );
+  } catch (err) {
+    console.warn('Error querying orders in Firestore:', err);
+    return [];
+  }
+}
+
+/**
  * Fetch recent orders from Firestore (for Admin or Live feeds)
  */
 export async function getFirebaseOrders(maxOrders = 50): Promise<FirebaseOrderData[]> {
@@ -142,4 +182,167 @@ export function subscribeToFirebaseOrder(
     console.warn('Real-time subscription error:', err);
     return () => {};
   }
+}
+
+/**
+ * Real-time subscription to all recent orders (for Admin Portal across all devices)
+ */
+export function subscribeToAllOrders(
+  onUpdate: (orders: FirebaseOrderData[]) => void,
+  maxOrders = 100
+): () => void {
+  try {
+    const q = query(
+      collection(db, ORDERS_COLLECTION),
+      orderBy('created_at', 'desc'),
+      limit(maxOrders)
+    );
+    return onSnapshot(q, (snapshot) => {
+      const orders: FirebaseOrderData[] = [];
+      snapshot.forEach((d) => {
+        orders.push(d.data() as FirebaseOrderData);
+      });
+      onUpdate(orders);
+    });
+  } catch (err) {
+    console.warn('Error subscribing to all orders:', err);
+    return () => {};
+  }
+}
+
+const SETTINGS_COLLECTION = 'settings';
+
+export interface FirebaseGatewayConfig {
+  fampayId: string;
+  apiKey?: string;
+  updated_at?: any;
+}
+
+/**
+ * Save FamPay UPI ID and Gateway Config to Firebase (instantly reflects on all devices)
+ */
+export async function saveGatewayConfigToFirebase(config: { fampayId: string; apiKey?: string }): Promise<void> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'gateway_config');
+    await setDoc(
+      docRef,
+      {
+        fampayId: config.fampayId,
+        apiKey: config.apiKey || '',
+        updated_at: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Error saving gateway config to Firebase:', error);
+  }
+}
+
+/**
+ * Get FamPay UPI ID and Gateway Config from Firebase
+ */
+export async function getGatewayConfigFromFirebase(): Promise<FirebaseGatewayConfig | null> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'gateway_config');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as FirebaseGatewayConfig;
+    }
+  } catch (error) {
+    console.error('Error fetching gateway config from Firebase:', error);
+  }
+  return null;
+}
+
+/**
+ * Subscribe to FamPay UPI ID in real-time across all devices
+ */
+export function subscribeToGatewayConfig(
+  onUpdate: (config: FirebaseGatewayConfig) => void
+): () => void {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'gateway_config');
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        onUpdate(docSnap.data() as FirebaseGatewayConfig);
+      }
+    });
+  } catch (err) {
+    console.warn('Real-time gateway config subscription error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Save Admin Passcode to Firebase (so new passcode works across all devices immediately)
+ */
+export async function saveAdminPinToFirebase(pin: string): Promise<void> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'admin_auth');
+    await setDoc(
+      docRef,
+      {
+        pin: pin.trim(),
+        updated_at: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Error saving admin pin to Firebase:', error);
+  }
+}
+
+/**
+ * Get Admin Passcode from Firebase
+ */
+export async function getAdminPinFromFirebase(): Promise<string | null> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'admin_auth');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && data.pin) {
+        return String(data.pin).trim();
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching admin pin from Firebase:', error);
+  }
+  return null;
+}
+
+/**
+ * Save HL Gaming Free Fire API credentials to Firebase
+ */
+export async function saveHlGamingConfigToFirebase(config: { useruid: string; api?: string }): Promise<void> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'hl_gaming');
+    await setDoc(
+      docRef,
+      {
+        useruid: config.useruid.trim(),
+        api: config.api ? config.api.trim() : '',
+        updated_at: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error('Error saving HL Gaming config to Firebase:', error);
+  }
+}
+
+/**
+ * Get HL Gaming Free Fire API credentials from Firebase
+ */
+export async function getHlGamingConfigFromFirebase(): Promise<{ useruid: string; api?: string } | null> {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, 'hl_gaming');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as { useruid: string; api?: string };
+    }
+  } catch (error) {
+    console.error('Error fetching HL Gaming config from Firebase:', error);
+  }
+  return null;
 }

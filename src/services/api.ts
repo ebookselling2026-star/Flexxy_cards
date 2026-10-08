@@ -1,5 +1,13 @@
 import { OrderResponse, OrderStatusResponse, OrderRecord, PlayerVerifyResponse } from '../types';
-import { syncOrderToFirebase, updateFirebaseOrderStatus, getFirebaseOrder } from '../lib/firestoreService';
+import {
+  syncOrderToFirebase,
+  updateFirebaseOrderStatus,
+  getFirebaseOrder,
+  saveGatewayConfigToFirebase,
+  getGatewayConfigFromFirebase,
+  subscribeToGatewayConfig,
+  queryOrdersByPlayerOrId,
+} from '../lib/firestoreService';
 
 const LOCAL_STORAGE_ORDERS_KEY = 'ff_topup_orders';
 const LOCAL_STORAGE_CONFIG_KEY = 'ff_fampay_config';
@@ -9,25 +17,68 @@ export interface FamPayConfig {
   apiKey: string;
 }
 
+// In-memory cache synced across all devices via Firestore
+let cachedFirestoreFamPayConfig: FamPayConfig = {
+  fampayId: '',
+  apiKey: '',
+};
+
+// Initialize real-time cross-device listener for gateway config
+if (typeof window !== 'undefined') {
+  subscribeToGatewayConfig((cfg) => {
+    if (cfg && cfg.fampayId) {
+      cachedFirestoreFamPayConfig = {
+        fampayId: cfg.fampayId,
+        apiKey: cfg.apiKey || '',
+      };
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(cachedFirestoreFamPayConfig));
+      } catch {}
+    }
+  });
+
+  // Initial fetch from Firestore
+  getGatewayConfigFromFirebase().then((cfg) => {
+    if (cfg && cfg.fampayId) {
+      cachedFirestoreFamPayConfig = {
+        fampayId: cfg.fampayId,
+        apiKey: cfg.apiKey || '',
+      };
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(cachedFirestoreFamPayConfig));
+      } catch {}
+    }
+  }).catch(() => {});
+}
+
 export function getSavedFamPayConfig(): FamPayConfig {
+  if (cachedFirestoreFamPayConfig.fampayId) {
+    return cachedFirestoreFamPayConfig;
+  }
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (parsed.fampayId) return parsed;
     }
   } catch {}
   return {
-    fampayId: '',
+    fampayId: 'thakur3041@fam',
     apiKey: '',
   };
 }
 
 export function saveFamPayConfig(config: FamPayConfig) {
+  cachedFirestoreFamPayConfig = config;
   try {
     localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(config));
   } catch (e) {
     console.error('Failed to save FamPay config in localStorage:', e);
   }
+  // Sync to Firestore so ALL other devices get this change instantly
+  saveGatewayConfigToFirebase(config).catch((err) => {
+    console.warn('Failed to sync gateway config to Firestore:', err);
+  });
 }
 
 function getLocalOrders(): OrderRecord[] {
@@ -320,20 +371,25 @@ export async function lookupOrders(query: string): Promise<OrderRecord[]> {
     console.warn('Lookup server error:', e);
   }
 
-  // Check Firebase directly if server returns nothing
+  // Check Firebase Firestore directly (works across all devices)
   try {
-    const fbOrder = await getFirebaseOrder(query);
-    if (fbOrder) {
-      return [{
+    const fbOrders = await queryOrdersByPlayerOrId(query);
+    if (fbOrders && fbOrders.length > 0) {
+      return fbOrders.map((fbOrder) => ({
         order_id: fbOrder.order_id,
         amount: fbOrder.amount,
         diamonds: fbOrder.diamonds,
+        bonus_diamonds: fbOrder.bonus_diamonds,
         player_uid: fbOrder.player_uid,
+        customer_name: fbOrder.customer_name,
+        customer_phone: fbOrder.customer_phone,
         fampay_id: fbOrder.fampay_id || 'thakur3041@fam',
         status: fbOrder.status,
         utr: fbOrder.utr,
+        qr_url: fbOrder.qr_url,
+        upi_intent: fbOrder.upi_intent,
         created_at: fbOrder.created_at,
-      }];
+      }));
     }
   } catch (e) {
     console.warn('Firebase order lookup error:', e);
