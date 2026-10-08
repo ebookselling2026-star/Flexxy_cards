@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -9,16 +10,53 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+// CORS & Preflight headers
+app.use((_req: Request, res: Response, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Api-Key');
+  if (_req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  next();
+});
+
+// Normalize /api prefix so requests work whether routed with or without /api by Vercel
+app.use((req: Request, _res: Response, next) => {
+  if (req.url && !req.url.startsWith('/api') && !req.url.startsWith('/@') && !req.url.startsWith('/src')) {
+    const knownEndpoints = [
+      'create-order',
+      'verify-player',
+      'checkout-status',
+      'verify-utr',
+      'simulate-payment',
+      'orders-lookup',
+      'gateway-config',
+      'webhook',
+      'admin',
+    ];
+    const pathWithoutSlash = req.url.replace(/^\//, '').split('?')[0];
+    if (knownEndpoints.some(ep => pathWithoutSlash.startsWith(ep))) {
+      req.url = '/api' + req.url;
+    }
+  }
+  next();
+});
 
 app.use(express.json());
 
 // Dynamic Gateway Config & Admin Security
 let adminPin = process.env.ADMIN_PIN || 'admin123';
 
-const GATEWAY_CONFIG_FILE = path.join(process.cwd(), 'gateway_config.json');
-const ORDERS_STORAGE_FILE = path.join(process.cwd(), 'orders_store.json');
+const storageDir = isVercel ? os.tmpdir() : process.cwd();
+const GATEWAY_CONFIG_FILE = path.join(storageDir, 'gateway_config.json');
+const ORDERS_STORAGE_FILE = path.join(storageDir, 'orders_store.json');
+const HL_CONFIG_FILE = path.join(storageDir, 'hl_config.json');
 
 let configStore = {
   apiKey: process.env.FAMGATEWAY_API_KEY || '',
@@ -38,7 +76,6 @@ try {
 }
 
 // HL Gaming Official Free Fire API Credentials
-const HL_CONFIG_FILE = path.join(process.cwd(), 'hl_config.json');
 let hlGamingConfig = {
   useruid: process.env.HL_GAMING_USERUID || 'Hwjexp62zVM8HZB7cj8L8MUVTSp1',
   api: process.env.HL_GAMING_API_KEY || '',
@@ -923,4 +960,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start the standalone HTTP listener if not running as a Vercel serverless function
+if (!isVercel) {
+  startServer();
+}
+
+export default app;

@@ -1,36 +1,23 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Search, HelpCircle, MessageCircle, Menu, X, Lock, Diamond, Terminal } from 'lucide-react';
+import { Menu, X, Diamond, Terminal } from 'lucide-react';
 
 interface NavbarProps {
   onOpenTrack: () => void;
   onOpenSupport: () => void;
   onOpenUidGuide: () => void;
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenTrack,
   onOpenSupport,
   onOpenUidGuide,
-  onOpenAdmin,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-[#04070b]/95 backdrop-blur-md border-b border-emerald-500/25 font-terminal">
-        {/* Terminal Micro Header Bar */}
-        <div className="bg-[#020508] text-emerald-400 text-[10px] sm:text-[11px] font-mono py-1 px-3 border-b border-emerald-500/10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>FLEXXY_CARDS_GATEWAY v3.1 // STATUS: ONLINE [GARENA-IND-SERVER]</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-3 text-slate-400">
-            <span>PORT: 3000</span>
-            <span>SSL: 256-BIT</span>
-          </div>
-        </div>
-
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
           {/* Brand Logo */}
           <div className="flex items-center gap-2.5">
@@ -42,10 +29,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="flex flex-col">
                 <span className="text-lg sm:text-xl font-black tracking-wider uppercase text-white leading-none">
                   FLEXXY <span className="text-emerald-400 text-glow-hacker">CARDS</span>
-                </span>
-                <span className="text-[9px] uppercase font-mono tracking-widest text-slate-400 flex items-center gap-1 mt-0.5">
-                  <span className="w-1 h-1 rounded-full bg-emerald-400" />
-                  GAMING VOUCHER VAULT
                 </span>
               </div>
             </a>
@@ -86,15 +69,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenAdmin}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 rounded-lg border border-slate-800 transition-colors flex items-center gap-1 text-xs cursor-pointer"
-              title="Store Admin Panel"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[10px] font-mono font-bold">ADMIN</span>
-            </button>
-
             <a
               href="#packages"
               className="px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 rounded-lg active:scale-95 transition-all shadow-md shadow-emerald-500/25 uppercase tracking-wider flex items-center gap-1.5"

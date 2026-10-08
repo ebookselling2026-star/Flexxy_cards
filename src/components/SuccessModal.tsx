@@ -71,43 +71,43 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in zoom-in-95 duration-200 font-terminal">
-      <div className="relative w-full max-w-lg bg-[#050b10] border-2 border-emerald-500/60 rounded-2xl shadow-2xl shadow-emerald-950/80 overflow-hidden my-auto flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in zoom-in-95 duration-200 font-terminal">
+      <div className="relative w-full max-w-sm sm:max-w-md bg-[#050b10] border-2 border-emerald-500/60 rounded-2xl shadow-2xl shadow-emerald-950/80 overflow-hidden my-auto flex flex-col">
         {/* Glow backdrop behind modal */}
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/20 blur-[100px] pointer-events-none" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/20 blur-[80px] pointer-events-none" />
 
         {/* Close Icon */}
         <button
           onClick={onClose}
-          className="absolute top-3.5 right-3.5 z-10 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute top-3 right-3 z-10 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Success Header */}
-        <div className="p-5 text-center border-b border-slate-800/80 shrink-0">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto mb-2 shadow-lg shadow-emerald-500/30 text-emerald-400 animate-bounce">
-            <Trophy className="w-6 h-6" />
+        <div className="p-4 text-center border-b border-slate-800/80 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto mb-1.5 shadow-lg shadow-emerald-500/30 text-emerald-400">
+            <Trophy className="w-5 h-5" />
           </div>
 
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold uppercase tracking-wider mb-1">
-            <Sparkles className="w-3 h-3" />
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-[9px] font-mono font-bold uppercase tracking-wider mb-1">
+            <Sparkles className="w-2.5 h-2.5" />
             <span>PAYMENT VERIFIED // DISPATCH READY</span>
           </span>
 
-          <h3 className="text-xl sm:text-2xl font-black uppercase text-white mb-1">
+          <h3 className="text-lg sm:text-xl font-black uppercase text-white mb-1">
             TRANSACTION CONFIRMED
           </h3>
 
-          <div className="bg-emerald-950/70 border border-emerald-500/50 rounded-xl p-2.5">
+          <div className="bg-emerald-950/70 border border-emerald-500/50 rounded-lg p-2">
             <p className="text-emerald-300 font-mono text-xs">
-              Diamonds adding to UID: <span className="text-white font-bold">{playerUid}</span> within 60-180 seconds!
+              Diamonds adding to UID: <span className="text-white font-bold">{playerUid}</span> within 60-180s!
             </p>
           </div>
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto max-h-[75vh]">
+        <div className="p-3.5 sm:p-4 space-y-3 overflow-y-auto max-h-[75vh]">
           {/* PRIMARY WHATSAPP DISPATCH CARD (Target: 9286520702) */}
           <div className="bg-[#08151b] border-2 border-emerald-400/80 rounded-xl p-3.5 space-y-2.5 shadow-lg shadow-emerald-950/60">
             <div className="flex items-center justify-between text-xs font-mono">

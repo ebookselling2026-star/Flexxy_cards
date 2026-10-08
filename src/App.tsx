@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TopUpPackage, CheckoutFormData, OrderResponse, PaymentMethod } from './types';
 import { createOrder } from './services/api';
 import { Navbar } from './components/Navbar';
@@ -50,6 +50,26 @@ export default function App() {
     buyerPhone: string;
     planName: string;
   } | null>(null);
+
+  // Check URL pathname or hash for /admin or #admin
+  useEffect(() => {
+    const checkAdminRoute = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path.includes('/admin') || hash === '#admin' || hash === '#/admin') {
+        setAdminModalOpen(true);
+      }
+    };
+
+    checkAdminRoute();
+    window.addEventListener('popstate', checkAdminRoute);
+    window.addEventListener('hashchange', checkAdminRoute);
+
+    return () => {
+      window.removeEventListener('popstate', checkAdminRoute);
+      window.removeEventListener('hashchange', checkAdminRoute);
+    };
+  }, []);
 
   // 1. Open Checkout on package selection
   const handleSelectPackage = (pkg: TopUpPackage) => {
@@ -152,10 +172,7 @@ export default function App() {
         {/* Hero Section with Live Countdown Timer */}
         <HeroSection />
 
-        {/* Live Verified Top-Up Activity Ticker */}
-        <LiveTransactions />
-
-        {/* Pricing Cards Grid (The 4 Diamond Packages) */}
+        {/* Pricing Cards Grid (The 4 Diamond Cards) */}
         <PackagesGrid onSelectPackage={handleSelectPackage} />
 
         {/* 3 Easy Steps How to Redeem */}
@@ -176,7 +193,10 @@ export default function App() {
         onOpenAdmin={() => setAdminModalOpen(true)}
       />
 
-      {/* Floating 24/7 WhatsApp Support Action */}
+      {/* Dynamic Animated Dispatch Notification in Left Corner */}
+      <LiveTransactions />
+
+      {/* Floating 24/7 WhatsApp Support Action (Right Corner) */}
       <FloatingWhatsApp onOpenSupport={() => setSupportModalOpen(true)} />
 
       {/* Checkout Form Modal */}

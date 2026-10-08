@@ -1,18 +1,17 @@
 import React from 'react';
-import { Terminal, ShieldCheck, MessageCircle, Lock } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 
 interface FooterProps {
   onOpenTrack: () => void;
   onOpenSupport: () => void;
   onOpenUidGuide: () => void;
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenTrack,
   onOpenSupport,
   onOpenUidGuide,
-  onOpenAdmin,
 }) => {
   return (
     <footer className="bg-[#020508] border-t border-emerald-500/15 text-slate-400 text-xs font-terminal">
@@ -50,13 +49,6 @@ export const Footer: React.FC<FooterProps> = ({
               className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
             >
               [WHATSAPP_SUPPORT]
-            </button>
-            <button
-              onClick={onOpenAdmin}
-              className="text-slate-500 hover:text-emerald-400 transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <Lock className="w-3 h-3" />
-              [ADMIN_PORTAL]
             </button>
           </div>
         </div>

@@ -12,13 +12,8 @@ import {
   Clock,
   ShieldCheck,
   AlertTriangle,
-  Flame,
-  CheckCircle2,
   Lock,
-  Zap,
-  Radio,
   ArrowRight,
-  ShieldAlert,
 } from 'lucide-react';
 
 interface PaymentModalProps {
@@ -45,7 +40,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onPaymentSuccess,
   onRetry,
 }) => {
-  // Session countdown (900 seconds / 15 mins)
   const [secondsRemaining, setSecondsRemaining] = useState(order?.expires_in || 900);
   const [isPolling, setIsPolling] = useState(true);
   const [pollCount, setPollCount] = useState(0);
@@ -58,13 +52,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [utrError, setUtrError] = useState<string | null>(null);
 
   // Tab mode: 'upi_app' (1-Tap Mobile UPI) or 'qr_code' (Scan QR)
-  // Default to upi_app on mobile, or qr_code if desktop, user can seamlessly toggle
   const [activeTab, setActiveTab] = useState<'upi_app' | 'qr_code'>('upi_app');
 
   const pollIntervalRef = useRef<any>(null);
   const activeFamPayId = order?.fampay_id || 'thakur3041@fam';
 
-  // Sync timer with order
+  // Sync timer
   useEffect(() => {
     if (order?.expires_in) {
       setSecondsRemaining(order.expires_in);
@@ -90,7 +83,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, isExpired]);
 
-  // Frontend Status Polling every 3.5s
+  // Automated status polling
   useEffect(() => {
     if (!isOpen || !order?.order_id || isExpired || !isPolling) return;
 
@@ -127,7 +120,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [isOpen, order?.order_id, isExpired, isPolling, onPaymentSuccess, pkg, playerUid]);
+  }, [isOpen, order?.order_id, isExpired, isPolling, onPaymentSuccess, pkg, playerUid, buyerName, buyerPhone]);
 
   if (!isOpen || !order || !pkg) return null;
 
@@ -152,7 +145,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setUtrError(null);
     const clean = manualUtr.trim().replace(/\s+/g, '');
     if (!clean || clean.length < 8) {
-      setUtrError('Please enter a valid 12-digit Bank UTR / Reference Number.');
+      setUtrError('Please enter valid 12-digit Bank UTR / Reference No.');
       return;
     }
     setManualUtrLoading(true);
@@ -168,10 +161,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           buyer_phone: buyerPhone,
         });
       } else {
-        setUtrError(res.message || 'Payment not detected for this UTR yet. Wait 30s or check UPI app.');
+        setUtrError(res.message || 'Payment not verified yet. Please check UTR or retry in 30s.');
       }
     } catch (err: any) {
-      setUtrError(err.message || 'Failed to verify UTR. Please wait for automated polling.');
+      setUtrError(err.message || 'Verification error. Auto-polling active.');
     } finally {
       setManualUtrLoading(false);
     }
@@ -193,42 +186,41 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           buyer_phone: buyerPhone,
         });
       } else {
-        setUtrError(`Status: ${result.status}. If payment was debited, please paste your 12-digit UTR below for instant confirmation.`);
+        setUtrError(`Status: ${result.status}. If paid, paste your 12-digit UTR below.`);
       }
     } catch {
-      setUtrError('Could not reach gateway server. Auto-polling is active.');
+      setUtrError('Could not sync status. Auto-polling active.');
     } finally {
       setManualCheckLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-      {/* Precision Proportioned Modal Frame */}
-      <div className="relative w-full max-w-lg bg-[#050b10] border border-emerald-500/40 rounded-2xl shadow-2xl shadow-emerald-950/90 overflow-hidden flex flex-col my-auto transition-all font-terminal">
-        {/* Subtle Cyber Matrix Corner Accents */}
-        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-emerald-400 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-emerald-400 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-emerald-400 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-emerald-400 pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      {/* Mobile-Optimized Compact Window (Balanced Ratio) */}
+      <div className="relative w-full max-w-sm sm:max-w-md bg-[#050b10] border border-emerald-500/40 rounded-2xl shadow-2xl shadow-emerald-950/90 overflow-hidden flex flex-col my-auto transition-all font-terminal">
+        {/* Hacker Corner Accents */}
+        <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-emerald-400 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-emerald-400 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-emerald-400 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-emerald-400 pointer-events-none" />
 
-        {/* Hacker / Cyber Header */}
-        <div className="bg-gradient-to-r from-[#07130f] via-[#091a14] to-[#050b10] px-4 py-3 border-b border-emerald-500/30 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-sm shadow-emerald-500/30">
-              <Lock className="w-4 h-4 text-emerald-400" />
+        {/* Compact Header */}
+        <div className="bg-gradient-to-r from-[#07130f] via-[#091a14] to-[#050b10] px-3.5 py-2.5 border-b border-emerald-500/30 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/50 flex items-center justify-center text-emerald-400">
+              <Lock className="w-3.5 h-3.5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-base font-black uppercase tracking-wider text-white">
-                  FLEXXY CARDS <span className="text-emerald-400 text-glow-hacker">// SECURE PAY</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-white">
+                  FLEXXY CARDS <span className="text-emerald-400">// PAY</span>
                 </span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/50 text-[9px] font-mono font-bold text-emerald-300 uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-[9px] font-mono font-bold text-emerald-300">
                   256-BIT SSL
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+              <div className="flex items-center gap-1 text-[9px] text-slate-400 font-mono">
                 <span>ORDER: {order.order_id}</span>
                 <button
                   type="button"
@@ -236,7 +228,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   className="hover:text-emerald-400 transition-colors cursor-pointer"
                   title="Copy Order ID"
                 >
-                  {copiedOrderId ? <Check className="w-3 h-3 text-emerald-400 inline" /> : <Copy className="w-3 h-3 inline" />}
+                  {copiedOrderId ? <Check className="w-2.5 h-2.5 text-emerald-400 inline" /> : <Copy className="w-2.5 h-2.5 inline" />}
                 </button>
               </div>
             </div>
@@ -244,7 +236,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -253,215 +245,173 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
         {/* Expired State */}
         {isExpired ? (
-          <div className="p-6 sm:p-8 text-center space-y-4 my-auto">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/20 border border-red-500/40 mx-auto flex items-center justify-center text-red-400 shadow-lg">
-              <AlertTriangle className="w-8 h-8" />
+          <div className="p-5 text-center space-y-3 my-auto">
+            <div className="w-12 h-12 rounded-xl bg-red-500/20 border border-red-500/40 mx-auto flex items-center justify-center text-red-400">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-2xl font-black uppercase text-white">
-              SESSION TIMED OUT
-            </h3>
-            <p className="text-slate-400 text-xs max-w-xs mx-auto font-mono">
-              The 15-minute payment session for order <span className="text-slate-200">{order.order_id}</span> has expired. Please create a new order to proceed.
+            <h3 className="text-lg font-black uppercase text-white">SESSION EXPIRED</h3>
+            <p className="text-slate-400 text-xs font-mono max-w-xs mx-auto">
+              15-minute payment window closed. Please generate a fresh order.
             </p>
             <button
               onClick={onRetry}
-              className="w-full py-3 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 text-slate-950 text-base font-black uppercase tracking-wider rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-emerald-500/30 cursor-pointer"
+              className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-black uppercase tracking-wider rounded-xl transition-all shadow-lg cursor-pointer"
             >
               Generate Fresh Order
             </button>
           </div>
         ) : (
-          /* Active Payment Body - Perfectly Proportioned */
-          <div className="p-4 sm:p-5 space-y-3.5 max-h-[84vh] overflow-y-auto">
-            {/* Compact Order & Player Summary Strip */}
-            <div className="bg-gradient-to-r from-[#07131b] via-[#09181e] to-[#071512] border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
-                  TARGET PLAYER UID
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-xs sm:text-sm font-bold text-cyan-400">
-                    UID: {playerUid}
-                  </span>
-                  {order.customer_name && (
-                    <span className="text-[11px] font-bold text-slate-200 px-1.5 py-0.2 rounded bg-slate-800/80 border border-slate-700 max-w-[130px] truncate">
-                      {order.customer_name}
-                    </span>
-                  )}
+          /* Streamlined Payment Body (Fits Mobile Viewports Perfectly) */
+          <div className="p-3.5 sm:p-4 space-y-3">
+            {/* High-Impact Compact Payment Summary Card */}
+            <div className="bg-gradient-to-r from-[#07131b] via-[#09181e] to-[#071512] border border-emerald-500/30 rounded-xl p-2.5 sm:p-3 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-mono text-slate-400 uppercase">
+                  FREE FIRE TOP-UP
                 </div>
-                <div className="text-[11px] text-cyan-300 font-bold flex items-center gap-1 font-mono">
-                  <span>💎 {pkg.diamonds.toLocaleString('en-IN')} DIAMONDS BALANCE</span>
-                  {pkg.bonusDiamonds > 0 && (
-                    <span className="text-emerald-300 text-[10px]">(+{pkg.bonusDiamonds.toLocaleString('en-IN')})</span>
+                <div className="text-sm sm:text-base font-black text-cyan-400 font-mono">
+                  💎 {pkg.diamonds.toLocaleString('en-IN')} DIAMONDS BALANCE
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                  <span className="text-slate-300">UID: {playerUid}</span>
+                  {order.customer_name && (
+                    <span className="text-emerald-400 font-bold max-w-[100px] truncate">({order.customer_name})</span>
                   )}
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
-                  PAYABLE AMOUNT
-                </span>
-                <span className="text-2xl sm:text-3xl font-black text-emerald-400 text-glow-hacker leading-none block mt-0.5">
+                <div className="text-xl sm:text-2xl font-black text-emerald-400 text-glow-hacker leading-tight">
                   {order.amount} INR
-                </span>
-                <span className="text-[9px] font-mono text-slate-400">Zero Gateway Fee</span>
-              </div>
-            </div>
-
-            {/* Live Status & Countdown Ribbon */}
-            <div className="bg-[#091016] border border-slate-800 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[11px] font-mono text-slate-400">EXPIRES:</span>
-                <span className="font-mono text-sm font-black text-amber-300 tabular-nums">
-                  {pad(minutes)}:{pad(seconds)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="hidden sm:inline">RADAR ACTIVE</span>
-                  <span>#{pollCount}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleManualCheckStatus}
-                  disabled={manualCheckLoading}
-                  className="px-2 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 rounded text-[10px] font-mono font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                >
-                  <RefreshCw className={`w-3 h-3 ${manualCheckLoading ? 'animate-spin' : ''}`} />
-                  <span>Sync</span>
-                </button>
+                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-amber-300">
+                  <Clock className="w-2.5 h-2.5" />
+                  <span>{pad(minutes)}:{pad(seconds)}</span>
+                </div>
               </div>
             </div>
 
-            {/* Tab Switcher: 1-Tap UPI vs Scan QR Code (Fixes Vertical Ratio Mismatch) */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#091118] border border-slate-800 rounded-xl">
+            {/* Seamless Tab Mode: 1-Tap UPI App vs Scan QR */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-[#091118] border border-slate-800 rounded-xl">
               <button
                 type="button"
                 onClick={() => setActiveTab('upi_app')}
-                className={`py-2 px-3 rounded-lg font-terminal text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg font-terminal text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'upi_app'
                     ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 shadow-md shadow-emerald-500/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
                 }`}
               >
-                <Smartphone className="w-4 h-4" />
+                <Smartphone className="w-3.5 h-3.5" />
                 <span>1-Tap UPI App</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('qr_code')}
-                className={`py-2 px-3 rounded-lg font-terminal text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`py-1.5 px-2 rounded-lg font-terminal text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'qr_code'
                     ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 shadow-md shadow-emerald-500/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
                 }`}
               >
-                <QrCode className="w-4 h-4" />
+                <QrCode className="w-3.5 h-3.5" />
                 <span>Scan QR Code</span>
               </button>
             </div>
 
-            {/* TAB CONTENT 1: 1-Tap Mobile UPI */}
+            {/* TAB 1: 1-Tap Mobile UPI Action */}
             {activeTab === 'upi_app' && (
-              <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="space-y-2.5 animate-in fade-in duration-150">
                 <a
                   href={order.upi_intent}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 hover:brightness-110 text-slate-950 font-terminal text-base sm:text-lg font-black uppercase tracking-wider rounded-xl shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 text-center cursor-pointer group"
+                  className="w-full py-3 px-3 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 hover:brightness-110 text-slate-950 font-terminal text-sm sm:text-base font-black uppercase tracking-wider rounded-xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 text-center cursor-pointer"
                 >
-                  <Smartphone className="w-5 h-5 text-slate-950" />
-                  <span>PAY {order.amount} INR VIA ANY UPI APP</span>
-                  <ExternalLink className="w-4 h-4 text-slate-950 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <Smartphone className="w-4 h-4 text-slate-950" />
+                  <span>PAY {order.amount} INR VIA UPI APP</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
                 </a>
 
-                {/* Supported UPI Apps Pills */}
-                <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-mono flex-wrap">
-                  <span className="px-2 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300 font-bold">
-                    PhonePe
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300 font-bold">
-                    Google Pay
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300 font-bold">
-                    Paytm
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300 font-bold">
-                    FamPay
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300 font-bold">
-                    CRED / BHIM
-                  </span>
+                {/* Quick UPI Apps Icons / Pills */}
+                <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 font-mono">
+                  <span className="px-1.5 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300">PhonePe</span>
+                  <span className="px-1.5 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300">GPay</span>
+                  <span className="px-1.5 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300">Paytm</span>
+                  <span className="px-1.5 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300">FamPay</span>
+                  <span className="px-1.5 py-0.5 rounded bg-[#091118] border border-slate-800 text-slate-300">BHIM</span>
                 </div>
               </div>
             )}
 
-            {/* TAB CONTENT 2: Scan QR Code (Exact 1:1 Aspect Ratio) */}
+            {/* TAB 2: Scan QR Code (Compact & Well-Proportioned) */}
             {activeTab === 'qr_code' && (
-              <div className="space-y-3 animate-in fade-in duration-200 flex flex-col items-center">
-                <div className="relative p-3.5 bg-white rounded-2xl shadow-xl shadow-black/80 hud-corner border-2 border-emerald-400 flex items-center justify-center">
+              <div className="space-y-2 animate-in fade-in duration-150 flex flex-col items-center">
+                <div className="relative p-2.5 bg-white rounded-xl shadow-lg border-2 border-emerald-400 flex items-center justify-center">
                   <img
                     src={order.qr_url}
                     alt="UPI Payment QR Code"
-                    className="w-44 h-44 sm:w-48 sm:h-48 object-contain rounded"
+                    className="w-36 h-36 sm:w-40 sm:h-40 object-contain rounded"
                   />
-                  {/* Subtle matrix scanline overlay */}
-                  <div className="absolute inset-x-3.5 h-1 bg-emerald-500/70 blur-xs animate-scanline pointer-events-none" />
                 </div>
-                <p className="text-[11px] text-slate-400 font-mono text-center">
-                  Scan using PhonePe, Paytm, Google Pay, or FamPay on any phone.
+                <p className="text-[10px] text-slate-400 font-mono text-center">
+                  Scan with any UPI app on any phone to complete {order.amount} INR payment
                 </p>
               </div>
             )}
 
-            {/* Copyable Merchant UPI ID Strip */}
-            <div className="bg-[#091118] border border-slate-800/90 rounded-xl p-2.5 flex items-center justify-between text-xs">
+            {/* Single-Tap Copy Merchant UPI ID */}
+            <div className="bg-[#091118] border border-slate-800 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs">
               <div className="overflow-hidden mr-2">
-                <span className="text-[10px] font-mono text-slate-400 block uppercase">
+                <span className="text-[9px] font-mono text-slate-400 uppercase block">
                   MERCHANT UPI ID:
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-emerald-300 truncate block">
+                <span className="font-mono text-xs font-bold text-emerald-300 truncate block">
                   {activeFamPayId}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleCopyUpi}
-                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold rounded-lg border border-slate-700 flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-bold rounded border border-slate-700 flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
               >
                 {copiedUpi ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <Check className="w-3 h-3 text-emerald-400" />
                     <span>Copied</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5" />
+                    <Copy className="w-3 h-3" />
                     <span>Copy</span>
                   </>
                 )}
               </button>
             </div>
 
-            {/* Error Message Box */}
+            {/* Error Message */}
             {utrError && (
-              <div className="p-2.5 bg-red-950/80 border border-red-500/50 rounded-xl text-red-300 text-xs flex items-start gap-2 animate-in fade-in duration-200">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                <span className="leading-tight text-[11px] font-mono">{utrError}</span>
+              <div className="p-2 bg-red-950/80 border border-red-500/50 rounded-lg text-red-300 text-[11px] flex items-center gap-1.5 font-mono animate-in fade-in duration-150">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span className="leading-tight">{utrError}</span>
               </div>
             )}
 
-            {/* Manual 12-Digit Bank UTR / Ref Verification Box */}
-            <form onSubmit={handleManualUtrSubmit} className="pt-2 border-t border-slate-800/80 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-300 font-mono flex items-center gap-1">
-                  <span>ENTER 12-DIGIT BANK UTR:</span>
-                  <span className="text-slate-500 font-normal text-[10px]">(IF ALREADY TRANSFERRED)</span>
-                </span>
+            {/* Compact Manual 12-Digit UTR Verification Form */}
+            <form onSubmit={handleManualUtrSubmit} className="pt-2 border-t border-slate-800/80 space-y-1">
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span className="font-bold text-slate-300">VERIFY PAYMENT VIA 12-DIGIT UTR:</span>
+                <button
+                  type="button"
+                  onClick={handleManualCheckStatus}
+                  disabled={manualCheckLoading}
+                  className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="Sync Status"
+                >
+                  <RefreshCw className={`w-2.5 h-2.5 ${manualCheckLoading ? 'animate-spin' : ''}`} />
+                  <span>Sync Status</span>
+                </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <input
                   type="text"
                   maxLength={16}
@@ -471,36 +421,36 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     if (utrError) setUtrError(null);
                   }}
                   placeholder="e.g. 429188029418"
-                  className="flex-1 bg-[#091118] border border-slate-700 focus:border-emerald-500 rounded-lg py-2 px-3 text-white text-xs font-mono placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="flex-1 bg-[#091118] border border-slate-700 focus:border-emerald-500 rounded-lg py-1.5 px-2.5 text-white text-xs font-mono placeholder:text-slate-600 focus:outline-none"
                 />
                 <button
                   type="submit"
                   disabled={manualUtrLoading || !manualUtr.trim()}
-                  className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-xs font-bold rounded-lg border border-emerald-500/30 disabled:opacity-50 cursor-pointer shadow transition-all flex items-center gap-1 shrink-0"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg disabled:opacity-50 cursor-pointer transition-all flex items-center gap-1 shrink-0 font-terminal"
                 >
                   {manualUtrLoading ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <RefreshCw className="w-3 h-3 animate-spin" />
                       <span>Checking...</span>
                     </>
                   ) : (
                     <>
-                      <span>Verify UTR</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Submit UTR</span>
+                      <ArrowRight className="w-3 h-3" />
                     </>
                   )}
                 </button>
               </div>
             </form>
 
-            {/* Trusted Security Guarantee Footer */}
-            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+            {/* Minimal High-Trust Bottom Tag */}
+            <div className="pt-1.5 border-t border-slate-800/60 flex items-center justify-between text-[9px] text-slate-400 font-mono">
               <span className="flex items-center gap-1 text-emerald-400">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                100% Anti-Ban Guarantee
+                <ShieldCheck className="w-3 h-3" />
+                100% Anti-Ban Official Server
               </span>
-              <span className="text-slate-400">
-                Avg Delivery: 60-180s
+              <span className="text-slate-500">
+                Automated 60-180s Credit
               </span>
             </div>
           </div>
