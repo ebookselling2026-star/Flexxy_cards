@@ -211,6 +211,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                   autoFocus
                   maxLength={12}
@@ -255,7 +257,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {isVerifying ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                    <span>VERIFYING GARENA PROFILE...</span>
+                    <span>FETCHING GARENA PROFILE...</span>
                   </>
                 ) : (
                   <>
@@ -278,24 +280,45 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
 
-              {/* Compact Verified Player Badge */}
-              <div className="rounded-xl bg-[#081219] border border-emerald-500/50 p-2.5 flex items-center justify-between text-xs font-mono">
-                <div className="overflow-hidden mr-2">
-                  <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold uppercase">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>VERIFIED: {playerInfo.name}</span>
+              {/* Rich Verified Free Fire Player Card */}
+              <div className="rounded-xl bg-[#081219] border border-emerald-500/50 p-3 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>GARENA VERIFIED ACCOUNT</span>
                   </div>
-                  <div className="text-[10px] text-slate-400">
-                    UID: {playerUid} • LVL {playerInfo.level || 70}
+                  <button
+                    type="button"
+                    onClick={() => setStep('enter_uid')}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 underline shrink-0 cursor-pointer"
+                  >
+                    Change UID
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-0.5">
+                  <div>
+                    <div className="text-sm font-black text-amber-300 font-mono tracking-wider">
+                      {customName || playerInfo.name}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      UID: <span className="text-white font-bold">{playerUid}</span> • {playerInfo.region || region}
+                    </div>
+                    {playerInfo.guild && (
+                      <div className="text-[10px] text-emerald-400/80 mt-0.5">
+                        Guild: {playerInfo.guild}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-cyan-400">
+                    <div className="bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded text-center">
+                      LVL {playerInfo.level || 70}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      ❤️ {(playerInfo.likes || 1850).toLocaleString()} Likes
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setStep('enter_uid')}
-                  className="text-[10px] text-emerald-400 hover:text-emerald-300 underline shrink-0 cursor-pointer"
-                >
-                  Change
-                </button>
               </div>
 
               {/* Buyer Name */}

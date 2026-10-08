@@ -312,11 +312,12 @@ function getRealisticPlayerProfile(uid: string, regionCode: string) {
 // GET /api/verify-player?uid=...&region=...
 app.get('/api/verify-player', async (req: Request, res: Response): Promise<void> => {
   try {
-    const uid = String(req.query.uid || '').trim();
+    const rawUid = String(req.query.uid || '').trim();
+    const uid = rawUid.replace(/\D/g, '');
     const regionParam = String(req.query.region || 'ind').trim();
     const regionCode = normalizeRegionCode(regionParam);
 
-    if (!uid || uid.length < 6 || !/^\d+$/.test(uid)) {
+    if (!uid || uid.length < 6) {
       res.status(400).json({
         success: false,
         verified: false,
