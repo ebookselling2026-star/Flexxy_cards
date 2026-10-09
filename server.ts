@@ -78,7 +78,7 @@ try {
 // HL Gaming Official Free Fire API Credentials
 let hlGamingConfig = {
   useruid: process.env.HL_GAMING_USERUID || 'Hwjexp62zVM8HZB7cj8L8MUVTSp1',
-  api: process.env.HL_GAMING_API_KEY || '',
+  api: process.env.HL_GAMING_API_KEY || 'Nomxie0704MWk3ikyDJhaT9EyNZ1dK',
 };
 
 // Load stored HL Gaming config if available

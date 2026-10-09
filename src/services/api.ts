@@ -495,58 +495,59 @@ export async function verifyFreeFirePlayer(uid: string, region: string): Promise
     console.warn('Backend verification call failed, attempting direct multi-region fallback:', err);
   }
 
-  // 3. Direct client-side HL Gaming call across candidates if credentials exist in Firestore
+  // 3. Direct client-side HL Gaming call across candidates (CORS enabled, works on all devices and Vercel)
   try {
     const hlConfig = await getHlGamingConfigFromFirebase().catch(() => null);
-    if (hlConfig && hlConfig.useruid && hlConfig.api) {
-      const candidateRegions = [regionCode, 'ind', 'bd', 'pk', 'sg', 'br'].filter(
-        (v, i, a) => a.indexOf(v) === i
-      );
+    const effectiveUseruid = hlConfig?.useruid?.trim() || 'Hwjexp62zVM8HZB7cj8L8MUVTSp1';
+    const effectiveApiKey = hlConfig?.api?.trim() || 'Nomxie0704MWk3ikyDJhaT9EyNZ1dK';
 
-      for (const reg of candidateRegions) {
+    const candidateRegions = [regionCode, 'ind', 'bd', 'pk', 'sg', 'br'].filter(
+      (v, i, a) => a.indexOf(v) === i
+    );
+
+    for (const reg of candidateRegions) {
+      try {
+        const hlUrl = `https://proapis.hlgamingofficial.com/main/games/freefire/account/api?sectionName=AllData&PlayerUid=${encodeURIComponent(cleanUid)}&region=${encodeURIComponent(reg)}&useruid=${encodeURIComponent(effectiveUseruid)}&api=${encodeURIComponent(effectiveApiKey)}`;
+        const hlRes = await fetch(hlUrl);
+        if (!hlRes.ok) continue;
+
+        const rawText = await hlRes.text();
+        let data: any = null;
         try {
-          const hlUrl = `https://proapis.hlgamingofficial.com/main/games/freefire/account/api?sectionName=AllData&PlayerUid=${encodeURIComponent(cleanUid)}&region=${encodeURIComponent(reg)}&useruid=${encodeURIComponent(hlConfig.useruid)}&api=${encodeURIComponent(hlConfig.api)}`;
-          const hlRes = await fetch(hlUrl);
-          if (!hlRes.ok) continue;
-
-          const rawText = await hlRes.text();
-          let data: any = null;
-          try {
-            data = JSON.parse(rawText);
-          } catch {}
-
-          if (!data || data.error) continue;
-
-          const root = data.result || data.data || data;
-          const accountInfo = root.AccountInfo || root.accountInfo || root.captainBasicInfo || root;
-          const guildInfo = root.GuildInfo || root.guildInfo || {};
-
-          const nickname =
-            accountInfo.AccountName ||
-            root.AccountName ||
-            accountInfo.nickname ||
-            root.nickname;
-
-          if (nickname && String(nickname).trim() !== '') {
-            const playerFound = {
-              uid: cleanUid,
-              name: String(nickname),
-              level: accountInfo.AccountLevel ? Number(accountInfo.AccountLevel) : 70,
-              likes: accountInfo.AccountLikes !== undefined ? Number(accountInfo.AccountLikes) : 0,
-              guild: guildInfo.GuildName || undefined,
-              region: (accountInfo.AccountRegion || reg).toUpperCase(),
-            };
-
-            saveCachedPlayerToFirebase(playerFound).catch(() => {});
-
-            return {
-              success: true,
-              verified: true,
-              player: playerFound,
-            };
-          }
+          data = JSON.parse(rawText);
         } catch {}
-      }
+
+        if (!data || data.error) continue;
+
+        const root = data.result || data.data || data;
+        const accountInfo = root.AccountInfo || root.accountInfo || root.captainBasicInfo || root;
+        const guildInfo = root.GuildInfo || root.guildInfo || {};
+
+        const nickname =
+          accountInfo.AccountName ||
+          root.AccountName ||
+          accountInfo.nickname ||
+          root.nickname;
+
+        if (nickname && String(nickname).trim() !== '') {
+          const playerFound = {
+            uid: cleanUid,
+            name: String(nickname),
+            level: accountInfo.AccountLevel ? Number(accountInfo.AccountLevel) : 70,
+            likes: accountInfo.AccountLikes !== undefined ? Number(accountInfo.AccountLikes) : 0,
+            guild: guildInfo.GuildName || undefined,
+            region: (accountInfo.AccountRegion || reg).toUpperCase(),
+          };
+
+          saveCachedPlayerToFirebase(playerFound).catch(() => {});
+
+          return {
+            success: true,
+            verified: true,
+            player: playerFound,
+          };
+        }
+      } catch {}
     }
   } catch (e) {
     console.warn('Direct multi-region check failed:', e);
