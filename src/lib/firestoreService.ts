@@ -346,3 +346,61 @@ export async function getHlGamingConfigFromFirebase(): Promise<{ useruid: string
   }
   return null;
 }
+
+const PLAYERS_COLLECTION = 'ff_players';
+
+export interface CachedPlayerRecord {
+  uid: string;
+  name: string;
+  level?: number;
+  likes?: number;
+  guild?: string;
+  region?: string;
+  brRankPoint?: number;
+  csRankPoint?: number;
+  updated_at?: any;
+}
+
+/**
+ * Cache verified player profile in Firebase so it loads instantly for all devices
+ */
+export async function saveCachedPlayerToFirebase(player: CachedPlayerRecord): Promise<void> {
+  if (!player.uid || !player.name) return;
+  try {
+    const docRef = doc(db, PLAYERS_COLLECTION, player.uid.trim());
+    await setDoc(
+      docRef,
+      {
+        uid: player.uid.trim(),
+        name: player.name.trim(),
+        level: player.level || 70,
+        likes: player.likes || 0,
+        guild: player.guild || '',
+        region: player.region || 'IND',
+        brRankPoint: player.brRankPoint || null,
+        updated_at: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (e) {
+    console.warn('Error saving player to Firestore cache:', e);
+  }
+}
+
+/**
+ * Get cached player profile from Firebase
+ */
+export async function getCachedPlayerFromFirebase(uid: string): Promise<CachedPlayerRecord | null> {
+  if (!uid) return null;
+  try {
+    const docRef = doc(db, PLAYERS_COLLECTION, uid.trim());
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as CachedPlayerRecord;
+    }
+  } catch (e) {
+    console.warn('Error reading player from Firestore cache:', e);
+  }
+  return null;
+}
+

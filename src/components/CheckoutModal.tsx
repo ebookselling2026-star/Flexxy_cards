@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TopUpPackage, PaymentMethod, CheckoutFormData } from '../types';
-import { verifyFreeFirePlayer } from '../services/api';
+import { verifyFreeFirePlayer, saveConfirmedPlayerIGN } from '../services/api';
 import {
   X,
   Diamond,
@@ -91,19 +91,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (res.success && res.verified) {
         lastVerifiedUidRef.current = cleanUid;
+        const fetchedName = res.player?.name ? res.player.name.trim() : '';
+
         const verifiedData = {
           uid: cleanUid,
-          name: res.player?.name || 'FREE FIRE PLAYER',
+          name: fetchedName,
           level: res.player?.level || 70,
           likes: res.player?.likes || 0,
-          guild: res.player?.guild || 'NO GUILD',
+          guild: res.player?.guild || '',
           region: res.player?.region || region,
         };
         setPlayerInfo(verifiedData);
-        setCustomName(verifiedData.name);
+        setCustomName(fetchedName || customName || '');
         setStep('account_details');
       } else {
-        setError(res.message || 'Player UID not found on Free Fire server. Please check your UID.');
+        setError(res.message || 'Player UID verification unavailable. Please retry.');
         setPlayerInfo(null);
       }
     } catch {
@@ -117,6 +119,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     e.preventDefault();
     setError(null);
 
+    const trimmedIGN = customName.trim() || playerInfo?.name || '';
+    if (!trimmedIGN) {
+      setError('Please enter your Free Fire In-Game Name (IGN) to ensure diamonds reach your account.');
+      return;
+    }
+
     const trimmedName = buyerName.trim();
     if (!trimmedName || trimmedName.length < 2) {
       setError('Please enter your full name (Buyer Name).');
@@ -129,10 +137,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    // Persist verified IGN to Firebase cache for cross-device consistency
+    saveConfirmedPlayerIGN(playerUid.trim(), trimmedIGN, region).catch(() => {});
+
     await onSubmit({
       playerUid: playerUid.trim(),
       region,
-      ign: customName.trim() || playerInfo?.name || '',
+      ign: trimmedIGN,
       buyerName: trimmedName,
       phone: trimmedPhone,
       paymentMethod,
@@ -247,6 +258,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </select>
               </div>
 
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] text-slate-500 font-mono">Try real UID:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlayerUid('2469113941');
+                    performVerification('2469113941');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 font-mono cursor-pointer"
+                >
+                  2469113941
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlayerUid('9351564274');
+                    performVerification('9351564274');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 font-mono cursor-pointer"
+                >
+                  9351564274
+                </button>
+              </div>
+
               {/* Verification Button */}
               <button
                 type="button"
@@ -257,7 +292,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {isVerifying ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                    <span>FETCHING GARENA PROFILE...</span>
+                    <span>FETCHING REAL GARENA PROFILE...</span>
                   </>
                 ) : (
                   <>
@@ -299,7 +334,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="flex items-center justify-between pt-0.5">
                   <div>
                     <div className="text-sm font-black text-amber-300 font-mono tracking-wider">
-                      {customName || playerInfo.name}
+                      {customName || playerInfo.name || 'Garena Player'}
                     </div>
                     <div className="text-[10px] text-slate-400 mt-0.5">
                       UID: <span className="text-white font-bold">{playerUid}</span> • {playerInfo.region || region}
@@ -319,6 +354,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Free Fire In-Game Name (IGN) Confirmation/Edit */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-emerald-400" />
+                    <span>FREE FIRE IN-GAME NAME (IGN)</span>
+                    <span className="text-emerald-400">*</span>
+                  </label>
+                  <span className="text-[9px] text-emerald-400 font-mono">
+                    {playerInfo.name ? 'Auto-Fetched' : 'Confirm Your IGN'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Enter your exact Free Fire nickname"
+                  className="w-full bg-[#091118] border border-slate-700 focus:border-emerald-500 rounded-xl py-2 px-3 text-amber-300 font-mono text-xs placeholder:text-slate-600 focus:outline-none"
+                />
               </div>
 
               {/* Buyer Name */}

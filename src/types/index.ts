@@ -70,6 +70,7 @@ export interface OrderRecord {
 export interface PlayerVerifyResponse {
   success: boolean;
   verified: boolean;
+  notFoundInGame?: boolean;
   player?: {
     uid: string;
     name?: string;

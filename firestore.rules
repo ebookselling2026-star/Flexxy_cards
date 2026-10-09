@@ -14,5 +14,10 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read, write: if true;
     }
+
+    // Cached Free Fire player profiles (UID to IGN nickname cache)
+    match /ff_players/{playerUid} {
+      allow read, write: if true;
+    }
   }
 }

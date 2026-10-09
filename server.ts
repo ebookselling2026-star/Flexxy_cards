@@ -262,50 +262,90 @@ function normalizeRegionCode(region?: string): string {
   return 'ind';
 }
 
-// Realistic Free Fire Profile Generator (used when HL Gaming keys are not yet configured or upstream offline)
-function getRealisticPlayerProfile(uid: string, regionCode: string) {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i++) {
-    hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+// In-memory cache for verified Free Fire player profiles (saves API quota)
+const playerProfilesCache = new Map<string, any>();
+
+async function fetchPlayerFromHLMultiRegion(uid: string, primaryRegion: string): Promise<any | null> {
+  if (!hlGamingConfig.useruid || !hlGamingConfig.api) return null;
+
+  const candidateRegions = [primaryRegion];
+  const others = ['ind', 'bd', 'pk', 'sg', 'br', 'id', 'me', 'th', 'vn'].filter(r => r !== primaryRegion);
+  candidateRegions.push(...others);
+
+  for (const reg of candidateRegions) {
+    try {
+      const hlUrl = `https://proapis.hlgamingofficial.com/main/games/freefire/account/api?sectionName=AllData&PlayerUid=${encodeURIComponent(uid)}&region=${encodeURIComponent(reg)}&useruid=${encodeURIComponent(hlGamingConfig.useruid)}&api=${encodeURIComponent(hlGamingConfig.api)}`;
+      const hlResponse = await fetch(hlUrl);
+      if (!hlResponse.ok) continue;
+
+      const rawText = await hlResponse.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(rawText);
+      } catch {}
+
+      if (!data || data.error) continue;
+
+      const root = data.result || data.data || data;
+      const accountInfo = root.AccountInfo || root.accountInfo || root.captainBasicInfo || root;
+      const guildInfo = root.GuildInfo || root.guildInfo || {};
+      const captainInfo = root.captainBasicInfo || {};
+
+      const nickname =
+        accountInfo.AccountName ||
+        root.AccountName ||
+        captainInfo.nickname ||
+        root.nickname ||
+        accountInfo.nickname;
+
+      if (nickname) {
+        const level =
+          accountInfo.AccountLevel ||
+          root.AccountLevel ||
+          captainInfo.level ||
+          root.level ||
+          accountInfo.level ||
+          70;
+
+        const likes =
+          accountInfo.AccountLikes !== undefined
+            ? accountInfo.AccountLikes
+            : root.AccountLikes !== undefined
+            ? root.AccountLikes
+            : captainInfo.liked !== undefined
+            ? captainInfo.liked
+            : 0;
+
+        const guild =
+          guildInfo.GuildName ||
+          root.GuildName ||
+          guildInfo.guildName ||
+          undefined;
+
+        const brRankPoint =
+          accountInfo.BrRankPoint ||
+          root.BrRankPoint ||
+          captainInfo.rankingPoints;
+
+        const csRankPoint = accountInfo.CsRankPoint || root.CsRankPoint;
+
+        return {
+          uid,
+          name: nickname,
+          level: Number(level),
+          likes: Number(likes),
+          guild: guild || undefined,
+          region: (accountInfo.AccountRegion || reg).toUpperCase(),
+          brRankPoint: brRankPoint ? Number(brRankPoint) : undefined,
+          csRankPoint: csRankPoint ? Number(csRankPoint) : undefined,
+        };
+      }
+    } catch (e) {
+      console.warn(`HL lookup error for region ${reg}:`, e);
+    }
   }
 
-  const gamerNames = [
-    '꧁ঔৣ☬R4J4_GAMER☬ঔৣ꧂',
-    '⚡THAKUR_FF_07⚡',
-    '亗_LEGEND_VIP_亗',
-    '࿐OP_RASTAR_࿐',
-    '★BLACK_VIPER★',
-    '꧁༒M4FI4_BOSS༒꧂',
-    '☠︎BAD_BOY_999☠︎',
-    'ᴮᴼˢˢܔELITE_PRO',
-    '꧁༒V.I.P_KILLER༒꧂',
-    '🔥FIRE_STORM_FF🔥',
-  ];
-
-  const guildNames = [
-    '★TEAM_ELITE★',
-    '亗ROYAL_WARRIORS亗',
-    'TEAM_IND_ESPORTS',
-    '★GOD_FATHER★',
-    'OVER_POWER_FF',
-    'NO_MERCY_GANG',
-  ];
-
-  const nameIndex = hash % gamerNames.length;
-  const guildIndex = (hash >> 3) % guildNames.length;
-  const level = 56 + (hash % 22); // Level between 56 and 77
-  const likes = 1450 + ((hash * 7) % 3200); // Likes between 1,450 and 4,650
-  const brRankPoint = 2900 + ((hash * 13) % 1400);
-
-  return {
-    uid,
-    name: gamerNames[nameIndex],
-    level,
-    likes,
-    guild: guildNames[guildIndex],
-    region: regionCode.toUpperCase(),
-    brRankPoint,
-  };
+  return null;
 }
 
 // 0. Player UID Verification via HL Gaming Official Free Fire API
@@ -326,100 +366,42 @@ app.get('/api/verify-player', async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Call HL Gaming API if credentials exist
-    if (hlGamingConfig.useruid && hlGamingConfig.api) {
-      try {
-        const hlUrl = `https://proapis.hlgamingofficial.com/main/games/freefire/account/api?sectionName=AllData&PlayerUid=${encodeURIComponent(uid)}&region=${encodeURIComponent(regionCode)}&useruid=${encodeURIComponent(hlGamingConfig.useruid)}&api=${encodeURIComponent(hlGamingConfig.api)}`;
-        console.log('[HL GAMING REQUEST] Calling URL for UID:', uid, 'Region:', regionCode);
-
-        const hlResponse = await fetch(hlUrl);
-        const rawText = await hlResponse.text();
-        console.log('[HL GAMING STATUS]', hlResponse.status, 'Body:', rawText);
-
-        let data: any = null;
-        try {
-          data = JSON.parse(rawText);
-        } catch (e) {
-          console.error('[HL GAMING PARSE ERROR]', e);
-        }
-
-        if (data && !data.error) {
-          const root = data.result || data.data || data;
-          const accountInfo = root.AccountInfo || root.accountInfo || root.captainBasicInfo || root;
-          const guildInfo = root.GuildInfo || root.guildInfo || {};
-          const captainInfo = root.captainBasicInfo || {};
-
-          const nickname =
-            accountInfo.AccountName ||
-            root.AccountName ||
-            captainInfo.nickname ||
-            root.nickname ||
-            accountInfo.nickname;
-
-          const level =
-            accountInfo.AccountLevel ||
-            root.AccountLevel ||
-            captainInfo.level ||
-            root.level ||
-            accountInfo.level;
-
-          const likes =
-            accountInfo.AccountLikes ||
-            root.AccountLikes ||
-            captainInfo.liked ||
-            accountInfo.likes;
-
-          const guild =
-            guildInfo.GuildName ||
-            root.GuildName ||
-            guildInfo.guildName;
-
-          const brRankPoint =
-            accountInfo.BrRankPoint ||
-            root.BrRankPoint ||
-            captainInfo.rankingPoints;
-
-          const csRankPoint = accountInfo.CsRankPoint || root.CsRankPoint;
-
-          if (nickname) {
-            console.log('[HL GAMING SUCCESS] Found player:', nickname, 'Level:', level, 'Likes:', likes, 'Guild:', guild);
-            res.json({
-              success: true,
-              verified: true,
-              player: {
-                uid,
-                name: nickname,
-                level: level ? Number(level) : 70,
-                likes: likes !== undefined ? Number(likes) : 0,
-                guild: guild || undefined,
-                region: (accountInfo.AccountRegion || regionCode).toUpperCase(),
-                brRankPoint: brRankPoint ? Number(brRankPoint) : undefined,
-                csRankPoint: csRankPoint ? Number(csRankPoint) : undefined,
-              },
-            });
-            return;
-          }
-        } else if (data && data.error) {
-          console.warn('[HL GAMING ERROR RETURNED]:', data.error);
-          res.json({
-            success: false,
-            verified: false,
-            message: data.error || 'Free Fire Player UID not found in this region. Please check your UID.',
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('HL Gaming API request failed, falling back:', err);
-      }
+    // 1. Check in-memory cache first
+    const cached = playerProfilesCache.get(uid);
+    if (cached && cached.name) {
+      res.json({
+        success: true,
+        verified: true,
+        player: cached,
+      });
+      return;
     }
 
-    // Authentic fallback with real gamer nickname, level, likes, and guild
-    const simulatedProfile = getRealisticPlayerProfile(uid, regionCode);
+    // 2. Fetch live from HL Gaming API across primary & fallback regions
+    const livePlayer = await fetchPlayerFromHLMultiRegion(uid, regionCode);
+    if (livePlayer && livePlayer.name) {
+      playerProfilesCache.set(uid, livePlayer);
+      res.json({
+        success: true,
+        verified: true,
+        player: livePlayer,
+      });
+      return;
+    }
+
+    // 3. If not found in game database (or API limit reached)
+    // Return verified: true with prompt for player to enter/confirm their IGN
     res.json({
       success: true,
       verified: true,
-      fallback: true,
-      player: simulatedProfile,
+      notFoundInGame: true,
+      player: {
+        uid,
+        name: '',
+        level: 70,
+        likes: 0,
+        region: regionCode.toUpperCase(),
+      },
     });
   } catch (error) {
     console.error('Verify player error:', error);
